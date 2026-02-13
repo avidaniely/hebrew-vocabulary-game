@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>משחק המילים - Multiplayer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Heebo', sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #fff7ed 0%, #ffe4e6 50%, #fce7f3 100%);
+            padding: 1rem;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 4px solid #fed7aa;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: #1e293b;
+            margin-bottom: 0.25rem;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        .lobby {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            text-align: center;
+            border: 4px solid #fbcfe8;
+        }
+
+        .lobby h2 {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #1e293b;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            padding: 1rem 2rem;
+            border-radius: 1rem;
+            border: none;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #fb923c 0%, #ec4899 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+            color: #1e293b;
+        }
+
+        .waiting {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #fbbf24;
+            border-top: 4px solid #fb923c;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .player-board {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            border: 4px solid;
+        }
+
+        .player-board.you {
+            border-color: #34d399;
+        }
+
+        .player-board.opponent {
+            border-color: #f87171;
+        }
+
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            border-radius: 0.75rem;
+        }
+
+        .player-header.you {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        }
+
+        .player-header.opponent {
+            background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+        }
+
+        .player-name {
+            font-weight: 900;
+            font-size: 1.1rem;
+            color: #1e293b;
+        }
+
+        .player-score {
+            background: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            font-weight: 900;
+            font-size: 1.2rem;
+            color: #1e293b;
+        }
+
+        .guesses-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .guess-row {
+            display: flex;
+            gap: 0.3rem;
+            justify-content: center;
+        }
+
+        .letter-box {
+            width: 2.2rem;
+            height: 2.2rem;
+            border: 3px solid #cbd5e1;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            font-weight: 900;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .letter-box.correct {
+            background: #10b981;
+            color: white;
+            border-color: #059669;
+        }
+
+        .letter-box.present {
+            background: #fbbf24;
+            color: white;
+            border-color: #f59e0b;
+        }
+
+        .letter-box.absent {
+            background: #94a3b8;
+            color: white;
+            border-color: #64748b;
+        }
+
+        .controls {
+            grid-column: 1 / -1;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            border: 4px solid #c7d2fe;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .btn-delete {
+            background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+            color: #1e293b;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #34d399 0%, #14b8a6 100%);
+            color: white;
+            padding: 0.75rem 2rem;
+            border-radius: 0.75rem;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .keyboard {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .keyboard-row {
+            display: flex;
+            gap: 0.25rem;
+            justify-content: center;
+        }
+
+        .key {
+            width: 2rem;
+            height: 2.5rem;
+            border-radius: 0.5rem;
+            border: 2px solid;
+            background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+            border-color: #93c5fd;
+            color: #1e293b;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .key:active {
+            transform: scale(0.95);
+        }
+
+        .game-over-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            z-index: 1000;
+            min-width: 300px;
+            border: 4px solid;
+            animation: bounceIn 0.5s ease;
+        }
+
+        .game-over-modal.won {
+            border-color: #34d399;
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        }
+
+        .game-over-modal.lost {
+            border-color: #fbbf24;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        }
+
+        .game-over-modal h2 {
+            font-size: 2rem;
+            font-weight: 900;
+            margin-bottom: 1rem;
+            color: #1e293b;
+        }
+
+        .translation {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 1.5rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @keyframes bounceIn {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            70% { transform: translate(-50%, -50%) scale(1.05); }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 0.5rem;
+        }
+
+        .status-indicator.active {
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.waiting {
+            background: #fbbf24;
+        }
+
+        .status-indicator.finished {
+            background: #94a3b8;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @media (max-width: 768px) {
+            .game-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .letter-box {
+                width: 2rem;
+                height: 2rem;
+                font-size: 1rem;
+            }
+            
+            .key {
+                width: 1.8rem;
+                height: 2.2rem;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎮 משחק המילים - מרובה משתתפים</h1>
+            <div class="subtitle">Hebrew Vocabulary Game - Multiplayer</div>
+        </div>
+
+        <!-- Lobby Screen -->
+        <div class="lobby" id="lobby">
+            <h2>ברוכים הבאים! Welcome!</h2>
+            <div id="lobbyContent">
+                <button class="btn btn-primary" id="findMatchBtn">🔍 מצא יריב / Find Match</button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div class="game-container hidden" id="gameContainer">
+            <!-- Your Board -->
+            <div class="player-board you" id="yourBoard">
+                <div class="player-header you">
+                    <div class="player-name">
+                        אתה / You
+                        <span class="status-indicator" id="yourStatus"></span>
+                    </div>
+                    <div class="player-score" id="yourScore">0</div>
+                </div>
+                <div class="guesses-grid" id="yourGuesses"></div>
+            </div>
+
+            <!-- Opponent Board -->
+            <div class="player-board opponent" id="opponentBoard">
+                <div class="player-header opponent">
+                    <div class="player-name">
+                        יריב / Opponent
+                        <span class="status-indicator" id="opponentStatus"></span>
+                    </div>
+                    <div class="player-score" id="opponentScore">0</div>
+                </div>
+                <div class="guesses-grid" id="opponentGuesses"></div>
+            </div>
+
+            <!-- Controls -->
+            <div class="controls">
+                <div class="action-buttons" id="actionButtons">
+                    <button class="btn btn-delete" id="deleteBtn">← מחק</button>
+                    <button class="btn btn-submit" id="submitBtn">✓ אישור</button>
+                </div>
+                <div class="keyboard" id="keyboard"></div>
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div class="game-over-modal hidden" id="gameOverModal">
+            <h2 id="resultTitle"></h2>
+            <div class="translation" id="wordTranslation"></div>
+            <button class="btn btn-primary" id="playAgainBtn">🔄 שחק שוב / Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        
+        const TRANSLATIONS = {
+            'שלום': 'שלום (Shalom) - Peace/Hello',
+            'תודה': 'תודה (Toda) - Thank you',
+            'בוקר': 'בוקר (Boker) - Morning',
+            'ערב': 'ערב (Erev) - Evening',
+            'ילד': 'ילד (Yeled) - Boy/Child',
+            'בית': 'בית (Bayit) - House',
+            'ספר': 'ספר (Sefer) - Book',
+            'מים': 'מים (Mayim) - Water',
+            'לחם': 'לחם (Lechem) - Bread',
+            'אמא': 'אמא (Ima) - Mom',
+            'אבא': 'אבא (Aba) - Dad',
+            'כלב': 'כלב (Kelev) - Dog',
+            'חתול': 'חתול (Chatul) - Cat',
+            'יום': 'יום (Yom) - Day',
+            'לילה': 'לילה (Layla) - Night',
+            'אור': 'אור (Or) - Light',
+            'שמש': 'שמש (Shemesh) - Sun',
+            'ירח': 'ירח (Yareach) - Moon',
+            'עץ': 'עץ (Etz) - Tree',
+            'פרח': 'פרח (Perach) - Flower'
+        };
+
+        const HEBREW_KEYBOARD = [
+            ['ק', 'ר', 'א', 'ט', 'ו', 'ן', 'ם', 'פ'],
+            ['ש', 'ד', 'ג', 'כ', 'ע', 'י', 'ח', 'ל', 'ך', 'ף'],
+            ['ז', 'ס', 'ב', 'ה', 'ן', 'מ', 'צ', 'ת', 'ץ']
+        ];
+
+        let myId = null;
+        let opponentId = null;
+        let currentGuess = '';
+        let targetWordLength = 0;
+        let gameState = null;
+
+        // UI Elements
+        const lobby = document.getElementById('lobby');
+        const lobbyContent = document.getElementById('lobbyContent');
+        const findMatchBtn = document.getElementById('findMatchBtn');
+        const gameContainer = document.getElementById('gameContainer');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const submitBtn = document.getElementById('submitBtn');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+        const gameOverModal = document.getElementById('gameOverModal');
+
+        // Find match
+        findMatchBtn.addEventListener('click', () => {
+            socket.emit('findMatch');
+        });
+
+        // Waiting for opponent
+        socket.on('waitingForOpponent', () => {
+            lobbyContent.innerHTML = `
+                <div class="waiting">
+                    <div class="spinner"></div>
+                    <h3>מחפש יריב...</h3>
+                    <p>Searching for opponent...</p>
+                    <button class="btn btn-secondary" id="cancelBtn">ביטול / Cancel</button>
+                </div>
+            `;
+            
+            document.getElementById('cancelBtn').addEventListener('click', () => {
+                socket.emit('cancelMatch');
+                location.reload();
+            });
+        });
+
+        // Match found
+        socket.on('matchFound', (data) => {
+            myId = data.yourId;
+            opponentId = data.opponentId;
+            lobby.classList.add('hidden');
+            gameContainer.classList.remove('hidden');
+        });
+
+        // Game start
+        socket.on('gameStart', (data) => {
+            targetWordLength = data.targetWordLength;
+            gameState = data.gameState;
+            currentGuess = '';
+            
+            renderKeyboard();
+            renderGame();
+            updateButtons();
+        });
+
+        // Game update
+        socket.on('gameUpdate', (state) => {
+            gameState = state;
+            renderGame();
+            updateButtons();
+        });
+
+        // Game over
+        socket.on('gameOver', (data) => {
+            gameState = data.gameState;
+            renderGame();
+            
+            const won = data.winnerId === myId;
+            const modal = document.getElementById('gameOverModal');
+            const resultTitle = document.getElementById('resultTitle');
+            const wordTranslation = document.getElementById('wordTranslation');
+            
+            modal.classList.remove('hidden');
+            modal.classList.add(won ? 'won' : 'lost');
+            
+            if (data.winnerId) {
+                resultTitle.textContent = won ? '🎉 ניצחת! You Won!' : '😊 הפסדת! You Lost!';
+            } else {
+                resultTitle.textContent = '🤝 תיקו! Draw!';
+            }
+            
+            wordTranslation.textContent = TRANSLATIONS[data.targetWord] || data.targetWord;
+        });
+
+        // Opponent disconnected
+        socket.on('opponentDisconnected', () => {
+            alert('היריב התנתק / Opponent disconnected');
+            location.reload();
+        });
+
+        // Normalize Hebrew
+        function normalizeHebrew(text) {
+            const finalToRegular = {
+                'ך': 'כ', 'ם': 'מ', 'ן': 'נ',
+                'ף': 'פ', 'ץ': 'צ'
+            };
+            return text.split('').map(char => finalToRegular[char] || char).join('');
+        }
+
+        // Render game boards
+        function renderGame() {
+            if (!gameState) return;
+            
+            const yourPlayer = gameState.players[myId];
+            const opponentPlayer = gameState.players[opponentId];
+            
+            // Update scores
+            document.getElementById('yourScore').textContent = yourPlayer.score;
+            document.getElementById('opponentScore').textContent = opponentPlayer.score;
+            
+            // Update status indicators
+            const yourStatus = document.getElementById('yourStatus');
+            const opponentStatus = document.getElementById('opponentStatus');
+            
+            yourStatus.className = 'status-indicator ' + (yourPlayer.finished ? 'finished' : 'active');
+            opponentStatus.className = 'status-indicator ' + (opponentPlayer.finished ? 'finished' : 'active');
+            
+            // Render boards
+            renderBoard('yourGuesses', yourPlayer, true);
+            renderBoard('opponentGuesses', opponentPlayer, false);
+        }
+
+        function renderBoard(containerId, player, isYou) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            for (let i = 0; i < 6; i++) {
+                const row = document.createElement('div');
+                row.className = 'guess-row';
+                
+                for (let j = 0; j < targetWordLength; j++) {
+                    const box = document.createElement('div');
+                    box.className = 'letter-box';
+                    
+                    const guess = player.guesses[i];
+                    const isCurrentRow = i === player.guesses.length;
+                    
+                    if (guess) {
+                        box.textContent = guess.word[j];
+                        box.classList.add(guess.result[j]);
+                    } else if (isYou && isCurrentRow && currentGuess[j]) {
+                        box.textContent = currentGuess[j];
+                    }
+                    
+                    row.appendChild(box);
+                }
+                
+                container.appendChild(row);
+            }
+        }
+
+        // Render keyboard
+        function renderKeyboard() {
+            const keyboard = document.getElementById('keyboard');
+            keyboard.innerHTML = '';
+            
+            HEBREW_KEYBOARD.forEach(row => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'keyboard-row';
+                
+                row.forEach(letter => {
+                    const key = document.createElement('button');
+                    key.className = 'key';
+                    key.textContent = letter;
+                    key.addEventListener('click', () => handleLetterClick(letter));
+                    rowDiv.appendChild(key);
+                });
+                
+                keyboard.appendChild(rowDiv);
+            });
+        }
+
+        // Handle letter click
+        function handleLetterClick(letter) {
+            if (!gameState || currentGuess.length >= targetWordLength) return;
+            if (gameState.players[myId].finished) return;
+            
+            currentGuess += letter;
+            socket.emit('updateGuess', { guess: currentGuess });
+        }
+
+        // Handle backspace
+        deleteBtn.addEventListener('click', () => {
+            currentGuess = currentGuess.slice(0, -1);
+            socket.emit('updateGuess', { guess: currentGuess });
+        });
+
+        // Handle submit
+        submitBtn.addEventListener('click', () => {
+            if (currentGuess.length !== targetWordLength) return;
+            
+            // Server will validate the guess
+            socket.emit('submitGuess', { guess: currentGuess });
+            currentGuess = '';
+        });
+
+        // Play again
+        playAgainBtn.addEventListener('click', () => {
+            gameOverModal.classList.add('hidden');
+            socket.emit('newRound');
+        });
+
+        // Update buttons
+        function updateButtons() {
+            if (!gameState) return;
+            const finished = gameState.players[myId].finished;
+            
+            deleteBtn.disabled = currentGuess.length === 0 || finished;
+            submitBtn.disabled = currentGuess.length !== targetWordLength || finished;
+        }
+    </script>
+</body>
+</html>
